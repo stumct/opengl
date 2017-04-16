@@ -1,0 +1,291 @@
+package main
+
+import (
+	"fmt"
+	"image"
+	"image/draw"
+	_ "image/jpeg"
+	"log"
+	"os"
+	"runtime"
+	"strings"
+
+	"github.com/go-gl/gl/v3.3-core/gl"
+	"github.com/go-gl/glfw/v3.2/glfw"
+)
+
+var vertices = []float32{
+	// Positions          // Colors           // Texture Coords
+	0.5, 0.5, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, // Top Right
+	0.5, -0.5, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, // Bottom Right
+	-0.5, -0.5, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, // Bottom Left
+	-0.5, 0.5, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, // Top Left
+}
+var texCoords = []float32{
+	0.0, 0.0, // Lower-left corner
+	1.0, 0.0, // Lower-right corner
+	0.5, 1.0, // Top-center corner
+}
+
+var vertexShaderSource = `
+#version 330 core
+layout (location = 0) in vec3 position;
+layout (location = 1) in vec3 color;
+layout (location = 2) in vec2 texCoord;
+
+out vec3 ourColor;
+out vec2 TexCoord;
+
+void main()
+{
+    gl_Position = vec4(position, 1.0f);
+    ourColor = color;
+    TexCoord = texCoord;
+}
+` + "\x00"
+var fragmentShaderSource = `
+#version 330 core
+in vec3 ourColor;
+in vec2 TexCoord;
+
+out vec4 color;
+
+uniform sampler2D ourTexture;
+
+void main()
+{
+    color = texture(ourTexture, TexCoord);
+}
+` + "\x00"
+
+func init() {
+	// This is needed to arrange that main() runs on main thread.
+	// See documentation for functions that are only allowed to be called from the main thread.
+	runtime.LockOSThread()
+}
+
+func main() {
+
+	// Initialise GLFW
+	err := glfw.Init()
+	if err != nil {
+		panic(err)
+	}
+	defer glfw.Terminate()
+
+	// Provide window hints for GLFW
+	glfw.WindowHint(glfw.ContextVersionMajor, 3)                // OpenGL Version 3.3
+	glfw.WindowHint(glfw.ContextVersionMinor, 3)                // OpenGL Version 3.3
+	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile) // use the core version
+	glfw.WindowHint(glfw.Resizable, glfw.False)                 // disable window resizing
+
+	// Create the window object
+	window, err := glfw.CreateWindow(1024, 768, "Testing", nil, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	// Make the context of our window the main context on the current thread
+	window.MakeContextCurrent()
+
+	if runtime.GOOS == "windows" {
+		window.SetPos(32, 64)
+	}
+
+	if err := gl.Init(); err != nil {
+		panic(err)
+	}
+
+	// Get the width and heigh of the window from GLFW
+	width, height := window.GetFramebufferSize()
+	// Set the location of the lower left corner of the window.
+	// And the width and height of the rendering window in pixels
+	gl.Viewport(0, 0, int32(width), int32(height))
+
+	version := gl.GoStr(gl.GetString(gl.VERSION))
+	fmt.Println("OpenGL version", version)
+
+	// Key callback function to handle key press
+	// We register the callback functions after we've created the window and before the game loop is initiated.
+	window.SetKeyCallback(keycallback)
+
+	// Configure the vertex and fragment shaders
+	program, err := newProgram(vertexShaderSource, fragmentShaderSource)
+	if err != nil {
+		panic(err)
+	}
+
+	// Configure the vertex data
+	var VAO uint32
+	gl.GenVertexArrays(1, &VAO)
+	gl.BindVertexArray(VAO)
+
+	var VBO uint32
+	gl.GenBuffers(1, &VBO)
+	gl.BindBuffer(gl.ARRAY_BUFFER, VBO)
+	gl.BufferData(gl.ARRAY_BUFFER, 4*4*8, gl.Ptr(vertices), gl.STATIC_DRAW)
+
+	var EBO uint32
+	//gl.GenBuffers(1, &EBO)
+	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, EBO)
+	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, 3*4*2, gl.Ptr(texCoords), gl.STATIC_DRAW)
+
+	//vertAttrib := uint32(gl.GetAttribLocation(program, gl.Str("vert\x00")))
+	gl.EnableVertexAttribArray(0)
+	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 8*4, gl.PtrOffset(0))
+
+	gl.EnableVertexAttribArray(1)
+	gl.VertexAttribPointer(1, 3, gl.FLOAT, false, 8*4, gl.PtrOffset(3*4))
+
+	gl.EnableVertexAttribArray(2)
+	gl.VertexAttribPointer(2, 2, gl.FLOAT, false, 8*4, gl.PtrOffset(6*4))
+
+	// Load the texture
+	texture, err := newTexture("container.jpg")
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	gl.UseProgram(program)
+
+	// Game Loop
+	for !window.ShouldClose() {
+		// Check and call events
+		glfw.PollEvents()
+
+		// Rendering
+		gl.ClearColor(0.2, 0.3, 0.3, 1.0)
+		gl.Clear(gl.COLOR_BUFFER_BIT)
+
+		//
+		//timeValue := glfw.GetTime()
+		//greenValue := (math.Sin(timeValue) / 2) + 0.5
+		//vertexColorLocation := gl.GetUniformLocation(program, gl.Str("ourColor\x00"))
+
+		// Activate the Shader
+		gl.UseProgram(program)
+
+		//gl.Uniform4f(vertexColorLocation, 0.0, float32(greenValue), 0.0, 1.0)
+
+		// Draw
+		gl.BindTexture(gl.TEXTURE_2D, texture)
+		gl.BindVertexArray(VAO)
+		//gl.DrawArrays(gl.TRIANGLES, 0, 3)
+		gl.DrawElements(gl.TRIANGLES,
+			6,
+			gl.UNSIGNED_INT,
+			gl.Ptr(&texCoords[0]))
+		gl.BindVertexArray(0)
+
+		// Swap the buffers
+		window.SwapBuffers()
+
+	}
+
+}
+
+func keycallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+	// When a user presses the escape key, we set the WindowShouldClose property to true,
+	// closing the application
+	if key == glfw.KeyEscape && action == glfw.Press {
+		w.SetShouldClose(true)
+	}
+}
+
+func compileShader(source string, shaderType uint32) (uint32, error) {
+	shader := gl.CreateShader(shaderType)
+
+	csources, free := gl.Strs(source)
+	gl.ShaderSource(shader, 1, csources, nil)
+	free()
+	gl.CompileShader(shader)
+
+	var status int32
+	gl.GetShaderiv(shader, gl.COMPILE_STATUS, &status)
+	if status == gl.FALSE {
+		var logLength int32
+		gl.GetShaderiv(shader, gl.INFO_LOG_LENGTH, &logLength)
+
+		log := strings.Repeat("\x00", int(logLength+1))
+		gl.GetShaderInfoLog(shader, logLength, nil, gl.Str(log))
+
+		return 0, fmt.Errorf("failed to compile %v: %v", source, log)
+	}
+
+	return shader, nil
+}
+
+func newProgram(vertexShaderSource, fragmentShaderSource string) (uint32, error) {
+	vertexShader, err := compileShader(vertexShaderSource, gl.VERTEX_SHADER)
+	if err != nil {
+		return 0, err
+	}
+
+	fragmentShader, err := compileShader(fragmentShaderSource, gl.FRAGMENT_SHADER)
+	if err != nil {
+		return 0, err
+	}
+
+	program := gl.CreateProgram()
+
+	gl.AttachShader(program, vertexShader)
+	gl.AttachShader(program, fragmentShader)
+	//gl.BindFragDataLocation(program, 0, gl.Str("outColor\x00"))
+	gl.LinkProgram(program)
+
+	var status int32
+	gl.GetProgramiv(program, gl.LINK_STATUS, &status)
+	if status == gl.FALSE {
+		var logLength int32
+		gl.GetProgramiv(program, gl.INFO_LOG_LENGTH, &logLength)
+
+		log := strings.Repeat("\x00", int(logLength+1))
+		gl.GetProgramInfoLog(program, logLength, nil, gl.Str(log))
+
+		return 0, fmt.Errorf("failed to link program: %v", log)
+	}
+
+	gl.DeleteShader(vertexShader)
+	gl.DeleteShader(fragmentShader)
+
+	return program, nil
+}
+
+func newTexture(file string) (uint32, error) {
+	imgFile, err := os.Open(file)
+	if err != nil {
+		return 0, fmt.Errorf("texture %q not found on disk: %v", file, err)
+	}
+	img, _, err := image.Decode(imgFile)
+	if err != nil {
+		return 0, err
+	}
+
+	rgba := image.NewRGBA(img.Bounds())
+	if rgba.Stride != rgba.Rect.Size().X*4 {
+		return 0, fmt.Errorf("unsupported stride")
+	}
+	draw.Draw(rgba, rgba.Bounds(), img, image.Point{0, 0}, draw.Src)
+
+	var texture uint32
+	gl.GenTextures(1, &texture)
+	gl.ActiveTexture(gl.TEXTURE0)
+	gl.BindTexture(gl.TEXTURE_2D, texture)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+	gl.TexImage2D(
+		gl.TEXTURE_2D,             // texture target
+		0,                         // mipmap level
+		gl.RGBA,                   // format
+		int32(rgba.Rect.Size().X), // width
+		int32(rgba.Rect.Size().Y), // height
+		0,                // always 0
+		gl.RGBA,          // source format
+		gl.UNSIGNED_BYTE, // source datatype
+		gl.Ptr(rgba.Pix)) // image data
+	gl.GenerateMipmap(gl.TEXTURE_2D)
+
+	return texture, nil
+}

@@ -1,0 +1,197 @@
+package main
+
+import (
+	"fmt"
+	"runtime"
+	"strings"
+
+	"github.com/go-gl/gl/v2.1/gl"
+	"github.com/go-gl/glfw/v3.2/glfw"
+)
+
+var vertices = []float32{
+	-0.5, 0.5, 1.0, 0.0, 0.0, // Top-left
+	0.5, 0.5, 0.0, 1.0, 0.0, // Top-right
+	0.5, -0.5, 0.0, 0.0, 1.0, // Bottom-right
+	-0.5, -0.5, 1.0, 1.0, 1.0, // Bottom-left
+}
+
+var elements = []uint{
+	0, 1, 2,
+}
+
+var vertexSource = `
+#version 150
+
+in vec2 position;
+in vec3 color;
+
+out vec3 Color;
+
+void main()
+{
+    Color = color;
+    gl_Position = vec4(position, 0.0, 1.0);
+}
+` + "\x00"
+
+var fragmentSource = `
+#version 150
+
+in vec3 Color;
+
+out vec4 outColor;
+
+void main()
+{
+    outColor = vec4(Color, 1.0);
+}
+` + "\x00"
+
+func init() {
+	// This is needed to arrange that main() runs on main thread.
+	// See documentation for functions that are only allowed to be called from the main thread.
+	runtime.LockOSThread()
+}
+
+func main() {
+	err := glfw.Init()
+	if err != nil {
+		panic(err)
+	}
+	defer glfw.Terminate()
+
+	window, err := glfw.CreateWindow(640, 480, "Testing", nil, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	window.MakeContextCurrent()
+
+	if runtime.GOOS == "windows" {
+		window.SetPos(32, 64)
+	}
+
+	if err := gl.Init(); err != nil {
+		panic(err)
+	}
+
+	version := gl.GoStr(gl.GetString(gl.VERSION))
+	fmt.Println("OpenGL version", version)
+
+	// Configure the vertex data
+	var vao uint32
+	gl.GenVertexArrays(1, &vao)
+	gl.BindVertexArray(vao)
+
+	var vbo uint32
+	gl.GenBuffers(1, &vbo)
+	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+	gl.BufferData(gl.ARRAY_BUFFER, len(vertices)*4, gl.Ptr(vertices), gl.STATIC_DRAW)
+
+	var ebo uint32
+	gl.GenBuffers(1, &ebo)
+	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo)
+	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(elements), gl.Ptr(elements), gl.STATIC_DRAW)
+
+	shaderProgram, err := newProgram(vertexSource, fragmentSource)
+	if err != nil {
+		panic(err)
+	}
+	//gl.BindFragDataLocation(shaderProgram, 0, gl.Str("outColor\x00"))
+	gl.UseProgram(shaderProgram)
+
+	posAttrib := uint32(gl.GetAttribLocation(shaderProgram, gl.Str("position\x00")))
+	gl.EnableVertexAttribArray(posAttrib)
+	gl.VertexAttribPointer(posAttrib, 2, gl.FLOAT, false, 5*4, nil)
+
+	colAttrib := uint32(gl.GetAttribLocation(shaderProgram, gl.Str("color\x00")))
+	gl.EnableVertexAttribArray(colAttrib)
+	gl.VertexAttribPointer(colAttrib, 3, gl.FLOAT, false, 5*4, gl.PtrOffset(2*4))
+
+	uniColor := gl.GetUniformLocation(shaderProgram, gl.Str("triangleColor\x00"))
+
+	gl.Uniform3f(uniColor, 1.0, 0.0, 0.0)
+
+	for !window.ShouldClose() {
+
+		gl.Enable(gl.MULTISAMPLE)
+
+		gl.Enable(gl.BLEND)
+		gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+		gl.Enable(gl.ALPHA_TEST)
+
+		//gl.DrawArrays(gl.TRIANGLES, 0, 6)
+		gl.DrawElements(gl.TRIANGLES,
+			6,
+			gl.UNSIGNED_INT,
+			nil)
+
+		/*time := 1.0
+		gl.Uniform3f(uniColor, (float32(math.Sin(time*4.0))+1.0)/2.0, 0.0, 0.0)
+		*/
+		// Do OpenGL stuff.
+		window.SwapBuffers()
+		glfw.PollEvents()
+	}
+
+}
+
+func compileShader(source string, shaderType uint32) (uint32, error) {
+	shader := gl.CreateShader(shaderType)
+
+	csources, free := gl.Strs(source)
+	gl.ShaderSource(shader, 1, csources, nil)
+	free()
+	gl.CompileShader(shader)
+
+	var status int32
+	gl.GetShaderiv(shader, gl.COMPILE_STATUS, &status)
+	if status == gl.FALSE {
+		var logLength int32
+		gl.GetShaderiv(shader, gl.INFO_LOG_LENGTH, &logLength)
+
+		log := strings.Repeat("\x00", int(logLength+1))
+		gl.GetShaderInfoLog(shader, logLength, nil, gl.Str(log))
+
+		return 0, fmt.Errorf("failed to compile %v: %v", source, log)
+	}
+
+	return shader, nil
+}
+
+func newProgram(vertexShaderSource, fragmentShaderSource string) (uint32, error) {
+	vertexShader, err := compileShader(vertexShaderSource, gl.VERTEX_SHADER)
+	if err != nil {
+		return 0, err
+	}
+
+	fragmentShader, err := compileShader(fragmentShaderSource, gl.FRAGMENT_SHADER)
+	if err != nil {
+		return 0, err
+	}
+
+	program := gl.CreateProgram()
+
+	gl.AttachShader(program, vertexShader)
+	gl.AttachShader(program, fragmentShader)
+	//gl.BindFragDataLocation(program, 0, gl.Str("outColor\x00"))
+	gl.LinkProgram(program)
+
+	var status int32
+	gl.GetProgramiv(program, gl.LINK_STATUS, &status)
+	if status == gl.FALSE {
+		var logLength int32
+		gl.GetProgramiv(program, gl.INFO_LOG_LENGTH, &logLength)
+
+		log := strings.Repeat("\x00", int(logLength+1))
+		gl.GetProgramInfoLog(program, logLength, nil, gl.Str(log))
+
+		return 0, fmt.Errorf("failed to link program: %v", log)
+	}
+
+	gl.DeleteShader(vertexShader)
+	gl.DeleteShader(fragmentShader)
+
+	return program, nil
+}
