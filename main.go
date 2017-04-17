@@ -8,6 +8,12 @@ import (
 	"github.com/go-gl/glfw/v3.1/glfw"
 )
 
+func init() {
+	// This is needed to arrange that main() runs on main thread.
+	// See documentation for functions that are only allowed to be called from the main thread.
+	runtime.LockOSThread()
+}
+
 func main() {
 
 	// Initialise GLFW
@@ -84,14 +90,14 @@ func keycallback(game *Game) func(*glfw.Window, glfw.Key, int, glfw.Action, glfw
 		}
 
 		if key == glfw.KeyUp && action == glfw.Press {
-			fmt.Println("KeyUp")
+			//fmt.Println("KeyUp")
 			if game.MixValue < 1.0 {
 				game.MixValue = game.MixValue + 0.1
 			}
 		}
 
 		if key == glfw.KeyDown && action == glfw.Press {
-			fmt.Println("KeyDown")
+			//fmt.Println("KeyDown")
 			if game.MixValue > 0.0 {
 				game.MixValue = game.MixValue - 0.1
 			}

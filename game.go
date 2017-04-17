@@ -5,6 +5,8 @@ import (
 	"log"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
+	"github.com/go-gl/glfw/v3.1/glfw"
+	mgl32 "github.com/go-gl/mathgl/mgl32"
 )
 
 type Game struct {
@@ -33,13 +35,13 @@ func (game *Game) Setup() {
 		log.Fatalln(err)
 	}
 	game.Texture1 = texture1
-	fmt.Println(texture1)
+	//fmt.Println(texture1)
 	texture2, err := NewTexture("assets/awesomeface.png")
 	if err != nil {
 		log.Fatalln(err)
 	}
 	game.Texture2 = texture2
-	fmt.Println(texture2)
+	//fmt.Println(texture2)
 
 	// Configure the vertex data
 	var VAO uint32
@@ -74,16 +76,6 @@ func (game *Game) Setup() {
 	game.VAO = VAO
 	game.Program = program
 
-	/*
-		vec := glm.Vec4{1.0, 0.0, 0.0, 1.0}
-
-			var trans glm.Mat4
-
-			trans = glm.Translate3D(1.0, 1.0, 0.0)
-
-			newvec := trans.Mul4x1(vec)
-			fmt.Println(newvec)
-	*/
 }
 
 func (game *Game) Render() {
@@ -99,6 +91,35 @@ func (game *Game) Render() {
 
 	// Set current value of uniform mix
 	gl.Uniform1f(gl.GetUniformLocation(game.Program, gl.Str("mixValue\x00")), game.MixValue)
+	/*
+		var transRotate mgl32.Mat4
+
+		transRotate = mgl32.HomogRotate3D(1.5708, mgl32.Vec3{0.0, 0.0, 1.0})
+
+		var transScale mgl32.Mat4
+		transScale = mgl32.Scale3D(0.5, 0.5, 0.5)
+
+		var trans mgl32.Mat4
+
+		trans = transRotate.Mul4(transScale)
+	*/
+	//ident := mgl32.Ident4()
+	//scale := mgl32.Scale3D(0.5, 0.5, 0.5)
+	//transformLoc := gl.GetUniformLocation(game.Program, gl.Str("transform\x00"))
+	//gl.UniformMatrix4fv(transformLoc, 1, false, &scale[0])
+
+	time := glfw.GetTime()
+	fmt.Println(time)
+
+	var translate mgl32.Mat4
+	translate = mgl32.Translate3D(0.5, -0.5, 0.0)
+	var rotate mgl32.Mat4
+	rotate = mgl32.HomogRotate3D(mgl32.DegToRad(float32(time*50.0)), mgl32.Vec3{0.0, 0.0, 1.0})
+	var trans mgl32.Mat4
+	trans = translate.Mul4(rotate)
+
+	transformLoc := gl.GetUniformLocation(game.Program, gl.Str("transform\x00"))
+	gl.UniformMatrix4fv(transformLoc, 1, false, &trans[0])
 
 	gl.BindVertexArray(game.VAO)
 	//gl.PolygonMode(gl.FRONT_AND_BACK, gl.LINE)
@@ -116,9 +137,11 @@ layout (location = 2) in vec2 texCoord;
 out vec3 ourColor;
 out vec2 TexCoord;
 
+uniform mat4 transform;
+
 void main()
 {
-    gl_Position = vec4(position, 1.0f);
+    gl_Position = transform * vec4(position, 1.0f);
     ourColor = color;
     // We swap the y-axis by substracing our coordinates from 1. This is done because most images have the top y-axis inversed with OpenGL's top y-axis.
 	// TexCoord = texCoord;
