@@ -52,6 +52,9 @@ func main() {
 	// And the width and height of the rendering window in pixels
 	gl.Viewport(0, 0, int32(width), int32(height))
 
+	// Setup OpenGL options
+	gl.Enable(gl.DEPTH_TEST)
+
 	version := gl.GoStr(gl.GetString(gl.VERSION))
 	fmt.Println("OpenGL version", version)
 
@@ -72,6 +75,7 @@ func main() {
 		// Rendering
 		gl.ClearColor(0.2, 0.3, 0.3, 1.0)
 		gl.Clear(gl.COLOR_BUFFER_BIT)
+		gl.Clear(gl.DEPTH_BUFFER_BIT)
 
 		// Run the main game render method
 		game.Render()

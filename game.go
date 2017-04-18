@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
@@ -48,26 +47,38 @@ func (game *Game) Setup() {
 	gl.GenVertexArrays(1, &VAO)
 	gl.BindVertexArray(VAO)
 
-	var EBO uint32
+	/*var EBO uint32
 	gl.GenBuffers(1, &EBO)
 	gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, EBO)
 	gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, len(indicesRect)*4, gl.Ptr(indicesRect), gl.STATIC_DRAW)
-
+	*/
+	/*	var VBO uint32
+		gl.GenBuffers(1, &VBO)
+		gl.BindBuffer(gl.ARRAY_BUFFER, VBO)
+		gl.BufferData(gl.ARRAY_BUFFER, len(verticesRectTex)*4, gl.Ptr(verticesRectTex), gl.STATIC_DRAW)
+	*/
 	var VBO uint32
 	gl.GenBuffers(1, &VBO)
 	gl.BindBuffer(gl.ARRAY_BUFFER, VBO)
-	gl.BufferData(gl.ARRAY_BUFFER, len(verticesRectTex)*4, gl.Ptr(verticesRectTex), gl.STATIC_DRAW)
-
+	gl.BufferData(gl.ARRAY_BUFFER, len(verticesCube)*4, gl.Ptr(verticesCube), gl.STATIC_DRAW)
 	// Coords Attributes
-	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 8*4, gl.PtrOffset(0))
-	gl.EnableVertexAttribArray(0)
+	//gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 8*4, gl.PtrOffset(0))
+	//gl.EnableVertexAttribArray(0)
 
 	// RGB Attributes
-	gl.VertexAttribPointer(1, 3, gl.FLOAT, false, 8*4, gl.PtrOffset(3*4))
-	gl.EnableVertexAttribArray(1)
+	//gl.VertexAttribPointer(1, 3, gl.FLOAT, false, 8*4, gl.PtrOffset(3*4))
+	//gl.EnableVertexAttribArray(1)
 
 	// Texture Attributes
-	gl.VertexAttribPointer(2, 2, gl.FLOAT, false, 8*4, gl.PtrOffset(6*4))
+	//gl.VertexAttribPointer(2, 2, gl.FLOAT, false, 8*4, gl.PtrOffset(6*4))
+	//gl.EnableVertexAttribArray(2)
+
+	// Coords Attributes
+	gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 5*4, gl.PtrOffset(0))
+	gl.EnableVertexAttribArray(0)
+
+	// Texture Attributes
+	gl.VertexAttribPointer(2, 2, gl.FLOAT, false, 5*4, gl.PtrOffset(3*4))
 	gl.EnableVertexAttribArray(2)
 
 	// unbind the VAO
@@ -90,7 +101,18 @@ func (game *Game) Render() {
 	gl.Uniform1i(gl.GetUniformLocation(game.Program, gl.Str("ourTexture2\x00")), 1)
 
 	// Set current value of uniform mix
-	gl.Uniform1f(gl.GetUniformLocation(game.Program, gl.Str("mixValue\x00")), game.MixValue)
+	//gl.Uniform1f(gl.GetUniformLocation(game.Program, gl.Str("mixValue\x00")), game.MixValue)
+
+	model := mgl32.HomogRotate3D(mgl32.DegToRad(float32(glfw.GetTime()*50.0)), mgl32.Vec3{0, 1, 1})
+
+	view := mgl32.Translate3D(0.0, 0.0, -8.0)
+
+	projection := mgl32.Perspective(mgl32.DegToRad(45.0), 1024/768, 0.1, 100.0)
+
+	gl.UniformMatrix4fv(gl.GetUniformLocation(game.Program, gl.Str("model\x00")), 1, false, &model[0])
+	gl.UniformMatrix4fv(gl.GetUniformLocation(game.Program, gl.Str("view\x00")), 1, false, &view[0])
+	gl.UniformMatrix4fv(gl.GetUniformLocation(game.Program, gl.Str("projection\x00")), 1, false, &projection[0])
+
 	/*
 		var transRotate mgl32.Mat4
 
@@ -107,24 +129,24 @@ func (game *Game) Render() {
 	//scale := mgl32.Scale3D(0.5, 0.5, 0.5)
 	//transformLoc := gl.GetUniformLocation(game.Program, gl.Str("transform\x00"))
 	//gl.UniformMatrix4fv(transformLoc, 1, false, &scale[0])
+	/*
+		time := glfw.GetTime()
+		fmt.Println(time)
 
-	time := glfw.GetTime()
-	fmt.Println(time)
+		var translate mgl32.Mat4
+		translate = mgl32.Translate3D(0.5, -0.5, 0.0)
+		var rotate mgl32.Mat4
+		rotate = mgl32.HomogRotate3D(mgl32.DegToRad(float32(glfw.GetTime()*50.0)), mgl32.Vec3{0.0, 0.0, 1.0})
+		var trans mgl32.Mat4
+		trans = translate.Mul4(rotate)
 
-	var translate mgl32.Mat4
-	translate = mgl32.Translate3D(0.5, -0.5, 0.0)
-	var rotate mgl32.Mat4
-	rotate = mgl32.HomogRotate3D(mgl32.DegToRad(float32(time*50.0)), mgl32.Vec3{0.0, 0.0, 1.0})
-	var trans mgl32.Mat4
-	trans = translate.Mul4(rotate)
-
-	transformLoc := gl.GetUniformLocation(game.Program, gl.Str("transform\x00"))
-	gl.UniformMatrix4fv(transformLoc, 1, false, &trans[0])
-
+		transformLoc := gl.GetUniformLocation(game.Program, gl.Str("transform\x00"))
+		gl.UniformMatrix4fv(transformLoc, 1, false, &trans[0])
+	*/
 	gl.BindVertexArray(game.VAO)
 	//gl.PolygonMode(gl.FRONT_AND_BACK, gl.LINE)
-	//gl.DrawArrays(gl.TRIANGLES, 0, 4)
-	gl.DrawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, gl.Ptr(nil))
+	gl.DrawArrays(gl.TRIANGLES, 0, 36)
+	//gl.DrawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, gl.Ptr(nil))
 	gl.BindVertexArray(0)
 }
 
@@ -137,11 +159,14 @@ layout (location = 2) in vec2 texCoord;
 out vec3 ourColor;
 out vec2 TexCoord;
 
-uniform mat4 transform;
+//uniform mat4 transform;
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
 
 void main()
 {
-    gl_Position = transform * vec4(position, 1.0f);
+    gl_Position = projection * view * model * vec4(position, 1.0f);
     ourColor = color;
     // We swap the y-axis by substracing our coordinates from 1. This is done because most images have the top y-axis inversed with OpenGL's top y-axis.
 	// TexCoord = texCoord;
@@ -189,4 +214,48 @@ var verticesRectTex = []float32{
 	0.5, -0.5, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, // Bottom Right
 	-0.5, -0.5, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, // Bottom Left
 	-0.5, 0.5, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, // Top Left
+}
+
+var verticesCube = []float32{
+	-0.5, -0.5, -0.5, 0.0, 0.0,
+	0.5, -0.5, -0.5, 1.0, 0.0,
+	0.5, 0.5, -0.5, 1.0, 1.0,
+	0.5, 0.5, -0.5, 1.0, 1.0,
+	-0.5, 0.5, -0.5, 0.0, 1.0,
+	-0.5, -0.5, -0.5, 0.0, 0.0,
+
+	-0.5, -0.5, 0.5, 0.0, 0.0,
+	0.5, -0.5, 0.5, 1.0, 0.0,
+	0.5, 0.5, 0.5, 1.0, 1.0,
+	0.5, 0.5, 0.5, 1.0, 1.0,
+	-0.5, 0.5, 0.5, 0.0, 1.0,
+	-0.5, -0.5, 0.5, 0.0, 0.0,
+
+	-0.5, 0.5, 0.5, 1.0, 0.0,
+	-0.5, 0.5, -0.5, 1.0, 1.0,
+	-0.5, -0.5, -0.5, 0.0, 1.0,
+	-0.5, -0.5, -0.5, 0.0, 1.0,
+	-0.5, -0.5, 0.5, 0.0, 0.0,
+	-0.5, 0.5, 0.5, 1.0, 0.0,
+
+	0.5, 0.5, 0.5, 1.0, 0.0,
+	0.5, 0.5, -0.5, 1.0, 1.0,
+	0.5, -0.5, -0.5, 0.0, 1.0,
+	0.5, -0.5, -0.5, 0.0, 1.0,
+	0.5, -0.5, 0.5, 0.0, 0.0,
+	0.5, 0.5, 0.5, 1.0, 0.0,
+
+	-0.5, -0.5, -0.5, 0.0, 1.0,
+	0.5, -0.5, -0.5, 1.0, 1.0,
+	0.5, -0.5, 0.5, 1.0, 0.0,
+	0.5, -0.5, 0.5, 1.0, 0.0,
+	-0.5, -0.5, 0.5, 0.0, 0.0,
+	-0.5, -0.5, -0.5, 0.0, 1.0,
+
+	-0.5, 0.5, -0.5, 0.0, 1.0,
+	0.5, 0.5, -0.5, 1.0, 1.0,
+	0.5, 0.5, 0.5, 1.0, 0.0,
+	0.5, 0.5, 0.5, 1.0, 0.0,
+	-0.5, 0.5, 0.5, 0.0, 0.0,
+	-0.5, 0.5, -0.5, 0.0, 1.0,
 }
