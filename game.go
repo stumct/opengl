@@ -5,19 +5,22 @@ import (
 
 	"github.com/go-gl/gl/v3.3-core/gl"
 	"github.com/go-gl/glfw/v3.1/glfw"
-	mgl32 "github.com/go-gl/mathgl/mgl32"
+	"github.com/go-gl/mathgl/mgl32"
 )
 
 type Game struct {
+	Width    int
+	Height   int
 	VAO      uint32
 	Program  uint32
 	Texture1 uint32
 	Texture2 uint32
 	MixValue float32
+	Cubes    []mgl32.Vec3
 }
 
-func NewGame() *Game {
-	return &Game{}
+func NewGame(width, height int) *Game {
+	return &Game{Width: width, Height: height}
 }
 
 func (game *Game) Setup() {
@@ -87,6 +90,19 @@ func (game *Game) Setup() {
 	game.VAO = VAO
 	game.Program = program
 
+	game.Cubes = []mgl32.Vec3{
+		mgl32.Vec3{0.0, 0.0, 0.0},
+		mgl32.Vec3{2.0, 5.0, -15.0},
+		mgl32.Vec3{-1.5, -2.2, -2.5},
+		mgl32.Vec3{-3.8, -2.0, -12.3},
+		mgl32.Vec3{2.4, -0.4, -3.5},
+		mgl32.Vec3{-1.7, 3.0, -7.5},
+		mgl32.Vec3{1.3, -2.0, -2.5},
+		mgl32.Vec3{1.5, 2.0, -2.5},
+		mgl32.Vec3{1.5, 0.2, -1.5},
+		mgl32.Vec3{-1.3, 1.0, -1.5},
+	}
+
 }
 
 func (game *Game) Render() {
@@ -102,17 +118,34 @@ func (game *Game) Render() {
 
 	// Set current value of uniform mix
 	//gl.Uniform1f(gl.GetUniformLocation(game.Program, gl.Str("mixValue\x00")), game.MixValue)
+	//ident := mgl32.Ident4()
+	//model := mgl32.HomogRotate3D(mgl32.DegToRad(float32(glfw.GetTime()*50.0)), mgl32.Vec3{0, 1, 1})
+	//model := mgl32.HomogRotate3D(mgl32.DegToRad(float32(glfw.GetTime()*50.0)), mgl32.Vec3{0, 1, 1})
+	model1 := mgl32.HomogRotate3DX(mgl32.DegToRad(float32(glfw.GetTime() * 50.0)))
+	model2 := mgl32.HomogRotate3DY(mgl32.DegToRad(float32(glfw.GetTime() * 50.0)))
+	model := model1.Mul4(model2)
+	view := mgl32.Translate3D(0, 0, -4.0)
 
-	model := mgl32.HomogRotate3D(mgl32.DegToRad(float32(glfw.GetTime()*50.0)), mgl32.Vec3{0, 1, 1})
+	projection := mgl32.Perspective(mgl32.DegToRad(45.0), 800/600, 0.1, 100.0)
 
-	view := mgl32.Translate3D(0.0, 0.0, -8.0)
-
-	projection := mgl32.Perspective(mgl32.DegToRad(45.0), 1024/768, 0.1, 100.0)
-
-	gl.UniformMatrix4fv(gl.GetUniformLocation(game.Program, gl.Str("model\x00")), 1, false, &model[0])
+	//gl.UniformMatrix4fv(gl.GetUniformLocation(game.Program, gl.Str("model\x00")), 1, false, &model[0])
 	gl.UniformMatrix4fv(gl.GetUniformLocation(game.Program, gl.Str("view\x00")), 1, false, &view[0])
 	gl.UniformMatrix4fv(gl.GetUniformLocation(game.Program, gl.Str("projection\x00")), 1, false, &projection[0])
 
+	gl.BindVertexArray(game.VAO)
+	for _, val := range game.Cubes {
+
+		position := mgl32.Translate3D(val.X(), val.Y(), val.Z())
+		model1 := mgl32.HomogRotate3DX(mgl32.DegToRad(float32(glfw.GetTime() * 50.0)))
+		model2 := mgl32.HomogRotate3DY(mgl32.DegToRad(float32(glfw.GetTime() * 50.0)))
+		model = model1.Mul4(model2)
+		model = model.Mul4(position)
+		gl.UniformMatrix4fv(gl.GetUniformLocation(game.Program, gl.Str("model\x00")), 1, false, &model[0])
+		//gl.UniformMatrix4fv(gl.GetUniformLocation(game.Program, gl.Str("view\x00")), 1, false, &view[0])
+		//gl.UniformMatrix4fv(gl.GetUniformLocation(game.Program, gl.Str("projection\x00")), 1, false, &projection[0])
+		gl.DrawArrays(gl.TRIANGLES, 0, 36)
+	}
+	gl.BindVertexArray(0)
 	/*
 		var transRotate mgl32.Mat4
 
@@ -143,11 +176,11 @@ func (game *Game) Render() {
 		transformLoc := gl.GetUniformLocation(game.Program, gl.Str("transform\x00"))
 		gl.UniformMatrix4fv(transformLoc, 1, false, &trans[0])
 	*/
-	gl.BindVertexArray(game.VAO)
+
 	//gl.PolygonMode(gl.FRONT_AND_BACK, gl.LINE)
 	gl.DrawArrays(gl.TRIANGLES, 0, 36)
 	//gl.DrawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, gl.Ptr(nil))
-	gl.BindVertexArray(0)
+
 }
 
 var vertexShaderSource = `
@@ -166,7 +199,13 @@ uniform mat4 projection;
 
 void main()
 {
+    //gl_Position = projection * view * model * vec4(position, 1.0f);
+    //gl_Position = projection * model * vec4(position, 1.0f);
+    //gl_Position = model * vec4(position, 1.0f);
+    //gl_Position = vec4(position, 1.0f);
+
     gl_Position = projection * view * model * vec4(position, 1.0f);
+	
     ourColor = color;
     // We swap the y-axis by substracing our coordinates from 1. This is done because most images have the top y-axis inversed with OpenGL's top y-axis.
 	// TexCoord = texCoord;

@@ -30,7 +30,7 @@ func main() {
 	glfw.WindowHint(glfw.Resizable, glfw.False)                 // disable window resizing
 
 	// Create the window object
-	window, err := glfw.CreateWindow(1024, 768, "Testing", nil, nil)
+	window, err := glfw.CreateWindow(800, 600, "Testing", nil, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -59,7 +59,7 @@ func main() {
 	fmt.Println("OpenGL version", version)
 
 	///////////////////////////////////////////
-	game := NewGame()
+	game := NewGame(width, height)
 	game.Setup()
 	/////////////////////////////////////////////
 
