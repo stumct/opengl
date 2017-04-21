@@ -15,6 +15,8 @@ func init() {
 }
 
 func main() {
+	// make sure that we display any errors that are encountered
+	//glfw.SetErrorCallback(errorCallback)
 
 	// Initialise GLFW
 	err := glfw.Init()
@@ -24,6 +26,7 @@ func main() {
 	defer glfw.Terminate()
 
 	// Provide window hints for GLFW
+	glfw.WindowHint(glfw.Samples, 4)                            // desired number of samples to use for mulitsampling
 	glfw.WindowHint(glfw.ContextVersionMajor, 3)                // OpenGL Version 3.3
 	glfw.WindowHint(glfw.ContextVersionMinor, 3)                // OpenGL Version 3.3
 	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile) // use the core version
@@ -37,6 +40,9 @@ func main() {
 
 	// Make the context of our window the main context on the current thread
 	window.MakeContextCurrent()
+
+	// disable v-sync for max FPS if the driver allows it
+	glfw.SwapInterval(0)
 
 	if runtime.GOOS == "windows" {
 		window.SetPos(32, 64)
@@ -107,4 +113,9 @@ func keycallback(game *Game) func(*glfw.Window, glfw.Key, int, glfw.Action, glfw
 			}
 		}
 	}
+}
+
+// handle GLFW errors by printing them out
+func errorCallback(err glfw.ErrorCode, desc string) {
+	fmt.Printf("%v: %v\n", err, desc)
 }
