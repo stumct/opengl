@@ -19,6 +19,10 @@ type Game struct {
 	Textures map[string]uint32
 	MixValue float32
 	Cubes    []mgl32.Vec3
+	Keys     map[glfw.Key]bool
+
+	deltaTime float32
+	lastFrame float32
 }
 
 func NewGame(width, height int) *Game {
@@ -26,6 +30,7 @@ func NewGame(width, height int) *Game {
 		Width:    width,
 		Height:   height,
 		Textures: map[string]uint32{},
+		Keys:     map[glfw.Key]bool{},
 	}
 }
 
@@ -75,8 +80,11 @@ func (game *Game) Setup() {
 
 }
 
-func (game *Game) Render() {
+func (game *Game) Render(camera *Camera) {
 	gl.UseProgram(game.Program)
+	game.UpdateTimes(float32(glfw.GetTime()))
+
+	game.UpdateCameraPosition(camera)
 
 	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, game.Textures["container.jpg"])
@@ -93,9 +101,15 @@ func (game *Game) Render() {
 		model1 := mgl32.HomogRotate3DX(mgl32.DegToRad(float32(glfw.GetTime() * 50.0)))
 		model2 := mgl32.HomogRotate3DY(mgl32.DegToRad(float32(glfw.GetTime() * 50.0)))
 		model := model0.Mul4(model1).Mul4(model2)
-		view := mgl32.Translate3D(0, 0, -4.0)
+		//view := mgl32.Translate3D(0, 0, -4.0)
+		//radius := 10.0
+		//camX := math.Sin(glfw.GetTime()) * radius
+		//camZ := math.Cos(glfw.GetTime()) * radius
+		//view = glm::lookAt(glm::vec3(camX, 0.0, camZ), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
+		//view := mgl32.LookAtV(mgl32.Vec3{float32(camX), 0.0, float32(camZ)}, mgl32.Vec3{0.0, 0.0, 0.0}, mgl32.Vec3{0.0, 1.0, 0.0})
+		view := camera.CurrentView()
 
-		projection := mgl32.Perspective(mgl32.DegToRad(45.0), 800/600, 0.1, 100.0)
+		projection := mgl32.Perspective(mgl32.DegToRad(float32(camera.FOV)), 800/600, 0.1, 100.0)
 
 		gl.UniformMatrix4fv(gl.GetUniformLocation(game.Program, gl.Str("model\x00")), 1, false, &model[0])
 		gl.UniformMatrix4fv(gl.GetUniformLocation(game.Program, gl.Str("view\x00")), 1, false, &view[0])
@@ -107,6 +121,26 @@ func (game *Game) Render() {
 	//gl.BindTexture(gl.TEXTURE_2D, game.Textures["container.jpg"])
 	//gl.DrawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, gl.Ptr(nil))
 	gl.BindVertexArray(0)
+}
+
+func (game *Game) UpdateTimes(time float32) {
+	game.deltaTime = time - game.lastFrame
+	game.lastFrame = time
+}
+func (game *Game) UpdateCameraPosition(camera *Camera) {
+	camera.SetDelta(float32(game.deltaTime))
+	if game.Keys[glfw.KeyW] {
+		camera.MoveForward()
+	}
+	if game.Keys[glfw.KeyS] {
+		camera.MoveBackward()
+	}
+	if game.Keys[glfw.KeyA] {
+		camera.MoveLeft()
+	}
+	if game.Keys[glfw.KeyD] {
+		camera.MoveRight()
+	}
 }
 
 var vertices = []float32{
