@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/go-gl/mathgl/mgl32"
@@ -119,5 +118,4 @@ func (c *Camera) HandleScrollEvent(xoffset, yoffset float64) {
 	if c.FOV >= 45.0 {
 		c.FOV = 45.0
 	}
-	fmt.Println(c.FOV)
 }

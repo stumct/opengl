@@ -10,27 +10,30 @@ import (
 const floatSize = 4
 
 type Game struct {
-	Width    int
-	Height   int
-	VAO      uint32
-	Program  uint32
-	Texture1 uint32
-	Texture2 uint32
-	Textures map[string]uint32
+	Width  int
+	Height int
+	VAO    uint32
+	Camera *Camera
+
+	ShaderPrograms map[string]uint32
+	Textures       map[string]uint32
+	InputKeys      map[glfw.Key]bool
+
 	MixValue float32
 	Cubes    []mgl32.Vec3
-	Keys     map[glfw.Key]bool
 
 	deltaTime float32
 	lastFrame float32
 }
 
-func NewGame(width, height int) *Game {
+func NewGame(width, height int, camera *Camera) *Game {
 	return &Game{
-		Width:    width,
-		Height:   height,
-		Textures: map[string]uint32{},
-		Keys:     map[glfw.Key]bool{},
+		Width:          width,
+		Height:         height,
+		Camera:         camera,
+		ShaderPrograms: map[string]uint32{},
+		Textures:       map[string]uint32{},
+		InputKeys:      map[glfw.Key]bool{},
 	}
 }
 
@@ -41,10 +44,10 @@ func (game *Game) Setup() {
 	if err != nil {
 		panic(err)
 	}
-	game.Program = prog
+	game.ShaderPrograms["BasicTextureShaders"] = prog
 
 	// Load the textures
-	tex, err := LoadTextures("./texture")
+	tex, err := LoadTextures("./textures")
 	if err != nil {
 		panic(err)
 	}
@@ -80,19 +83,20 @@ func (game *Game) Setup() {
 
 }
 
-func (game *Game) Render(camera *Camera) {
-	gl.UseProgram(game.Program)
-	game.UpdateTimes(float32(glfw.GetTime()))
+func (game *Game) Render() {
 
-	game.UpdateCameraPosition(camera)
+	game.UpdateTimes(float32(glfw.GetTime()))
+	game.UpdateCameraPosition()
+
+	gl.UseProgram(game.ShaderPrograms["BasicTextureShaders"])
 
 	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, game.Textures["container.jpg"])
-	gl.Uniform1i(gl.GetUniformLocation(game.Program, gl.Str("texture1\x00")), 0)
+	gl.Uniform1i(gl.GetUniformLocation(game.ShaderPrograms["BasicTextureShaders"], gl.Str("texture1\x00")), 0)
 
 	gl.ActiveTexture(gl.TEXTURE1)
 	gl.BindTexture(gl.TEXTURE_2D, game.Textures["awesomeface.png"])
-	gl.Uniform1i(gl.GetUniformLocation(game.Program, gl.Str("texture2\x00")), 1)
+	gl.Uniform1i(gl.GetUniformLocation(game.ShaderPrograms["BasicTextureShaders"], gl.Str("texture2\x00")), 1)
 
 	gl.BindVertexArray(game.VAO)
 
@@ -107,13 +111,13 @@ func (game *Game) Render(camera *Camera) {
 		//camZ := math.Cos(glfw.GetTime()) * radius
 		//view = glm::lookAt(glm::vec3(camX, 0.0, camZ), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
 		//view := mgl32.LookAtV(mgl32.Vec3{float32(camX), 0.0, float32(camZ)}, mgl32.Vec3{0.0, 0.0, 0.0}, mgl32.Vec3{0.0, 1.0, 0.0})
-		view := camera.CurrentView()
+		view := game.Camera.CurrentView()
 
-		projection := mgl32.Perspective(mgl32.DegToRad(float32(camera.FOV)), 800/600, 0.1, 100.0)
+		projection := mgl32.Perspective(mgl32.DegToRad(float32(game.Camera.FOV)), 800/600, 0.1, 100.0)
 
-		gl.UniformMatrix4fv(gl.GetUniformLocation(game.Program, gl.Str("model\x00")), 1, false, &model[0])
-		gl.UniformMatrix4fv(gl.GetUniformLocation(game.Program, gl.Str("view\x00")), 1, false, &view[0])
-		gl.UniformMatrix4fv(gl.GetUniformLocation(game.Program, gl.Str("projection\x00")), 1, false, &projection[0])
+		gl.UniformMatrix4fv(gl.GetUniformLocation(game.ShaderPrograms["BasicTextureShaders"], gl.Str("model\x00")), 1, false, &model[0])
+		gl.UniformMatrix4fv(gl.GetUniformLocation(game.ShaderPrograms["BasicTextureShaders"], gl.Str("view\x00")), 1, false, &view[0])
+		gl.UniformMatrix4fv(gl.GetUniformLocation(game.ShaderPrograms["BasicTextureShaders"], gl.Str("projection\x00")), 1, false, &projection[0])
 
 		gl.DrawArrays(gl.TRIANGLES, 0, 36)
 	}
@@ -127,107 +131,46 @@ func (game *Game) UpdateTimes(time float32) {
 	game.deltaTime = time - game.lastFrame
 	game.lastFrame = time
 }
-func (game *Game) UpdateCameraPosition(camera *Camera) {
-	camera.SetDelta(float32(game.deltaTime))
-	if game.Keys[glfw.KeyW] {
-		camera.MoveForward()
+func (game *Game) UpdateCameraPosition() {
+	game.Camera.SetDelta(float32(game.deltaTime))
+	if game.InputKeys[glfw.KeyW] {
+		game.Camera.MoveForward()
 	}
-	if game.Keys[glfw.KeyS] {
-		camera.MoveBackward()
+	if game.InputKeys[glfw.KeyS] {
+		game.Camera.MoveBackward()
 	}
-	if game.Keys[glfw.KeyA] {
-		camera.MoveLeft()
+	if game.InputKeys[glfw.KeyA] {
+		game.Camera.MoveLeft()
 	}
-	if game.Keys[glfw.KeyD] {
-		camera.MoveRight()
+	if game.InputKeys[glfw.KeyD] {
+		game.Camera.MoveRight()
 	}
 }
 
-var vertices = []float32{
-	-0.5, -0.5, 0.0,
-	0.5, -0.5, 0.0,
-	0.0, 0.5, 0.0,
+func (game *Game) CursorEventHandler() func(w *glfw.Window, xpos float64, ypos float64) {
+	return func(w *glfw.Window, xpos float64, ypos float64) {
+		game.Camera.HandleCursorEvent(xpos, ypos)
+	}
 }
 
-var vertices2 = []float32{
-	-0.5, -0.5, 0.0, 1.0, 0.0, 0.0,
-	0.5, -0.5, 0.0, 0.0, 1.0, 0.0,
-	0.0, 0.5, 0.0, 0.0, 0.0, 1.0,
+func (game *Game) ScrollEventHandler() func(w *glfw.Window, xoff float64, yoff float64) {
+	return func(w *glfw.Window, xoff float64, yoff float64) {
+		game.Camera.HandleScrollEvent(xoff, yoff)
+	}
 }
 
-var verticesRect = []float32{
-	// Positions          // Colors
-	0.5, 0.5, 0.0, 1.0, 0.0, 0.0, // Top Right
-	0.5, -0.5, 0.0, 0.0, 1.0, 0.0, // Bottom Right
-	-0.5, -0.5, 0.0, 0.0, 0.0, 1.0, // Bottom Left
-	-0.5, 0.5, 0.0, 1.0, 1.0, 0.0, // Top Left
-}
+func (game *Game) KeyEventHandler() func(*glfw.Window, glfw.Key, int, glfw.Action, glfw.ModifierKey) {
+	return func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+		// When a user presses the escape key, we set the WindowShouldClose property to true,
+		// closing the application
+		if key == glfw.KeyEscape && action == glfw.Press {
+			w.SetShouldClose(true)
+		}
 
-var indicesRect = []int32{
-	0, 1, 3, // First Triangle
-	1, 2, 3, // Second Triangle
-}
-var verticesRectTex = []float32{
-	// Positions          // Colors           // Texture Coords
-	0.5, 0.5, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, // Top Right
-	0.5, -0.5, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, // Bottom Right
-	-0.5, -0.5, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, // Bottom Left
-	-0.5, 0.5, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, // Top Left
-}
-
-var verticesCube = []float32{
-	-0.5, -0.5, -0.5, 0.0, 0.0,
-	0.5, -0.5, -0.5, 1.0, 0.0,
-	0.5, 0.5, -0.5, 1.0, 1.0,
-	0.5, 0.5, -0.5, 1.0, 1.0,
-	-0.5, 0.5, -0.5, 0.0, 1.0,
-	-0.5, -0.5, -0.5, 0.0, 0.0,
-
-	-0.5, -0.5, 0.5, 0.0, 0.0,
-	0.5, -0.5, 0.5, 1.0, 0.0,
-	0.5, 0.5, 0.5, 1.0, 1.0,
-	0.5, 0.5, 0.5, 1.0, 1.0,
-	-0.5, 0.5, 0.5, 0.0, 1.0,
-	-0.5, -0.5, 0.5, 0.0, 0.0,
-
-	-0.5, 0.5, 0.5, 1.0, 0.0,
-	-0.5, 0.5, -0.5, 1.0, 1.0,
-	-0.5, -0.5, -0.5, 0.0, 1.0,
-	-0.5, -0.5, -0.5, 0.0, 1.0,
-	-0.5, -0.5, 0.5, 0.0, 0.0,
-	-0.5, 0.5, 0.5, 1.0, 0.0,
-
-	0.5, 0.5, 0.5, 1.0, 0.0,
-	0.5, 0.5, -0.5, 1.0, 1.0,
-	0.5, -0.5, -0.5, 0.0, 1.0,
-	0.5, -0.5, -0.5, 0.0, 1.0,
-	0.5, -0.5, 0.5, 0.0, 0.0,
-	0.5, 0.5, 0.5, 1.0, 0.0,
-
-	-0.5, -0.5, -0.5, 0.0, 1.0,
-	0.5, -0.5, -0.5, 1.0, 1.0,
-	0.5, -0.5, 0.5, 1.0, 0.0,
-	0.5, -0.5, 0.5, 1.0, 0.0,
-	-0.5, -0.5, 0.5, 0.0, 0.0,
-	-0.5, -0.5, -0.5, 0.0, 1.0,
-
-	-0.5, 0.5, -0.5, 0.0, 1.0,
-	0.5, 0.5, -0.5, 1.0, 1.0,
-	0.5, 0.5, 0.5, 1.0, 0.0,
-	0.5, 0.5, 0.5, 1.0, 0.0,
-	-0.5, 0.5, 0.5, 0.0, 0.0,
-	-0.5, 0.5, -0.5, 0.0, 1.0,
-}
-
-var positions = []mgl32.Vec3{
-	mgl32.Vec3{0.0, 0.0, 0.0},
-	mgl32.Vec3{2.0, 5.0, -15.0},
-	mgl32.Vec3{-1.5, -2.2, -2.5},
-	mgl32.Vec3{-3.8, -2.0, -12.3},
-	mgl32.Vec3{2.4, -0.4, -3.5},
-	mgl32.Vec3{-1.7, 3.0, -7.5},
-	mgl32.Vec3{1.3, -2.0, -2.5},
-	mgl32.Vec3{1.5, 2.0, -2.5},
-	mgl32.Vec3{1.5, 0.2, -1.5},
-	mgl32.Vec3{-1.3, 1.0, -1.5},
+		if action == glfw.Press {
+			game.InputKeys[key] = true
+		} else if action == glfw.Release {
+			game.InputKeys[key] = false
+		}
+	}
 }

@@ -67,16 +67,16 @@ func main() {
 	///////////////////////////////////////////
 	camera := NewDefaultCamera()
 	camera.SetSpeed(5.00)
-	game := NewGame(width, height)
+	game := NewGame(width, height, camera)
 	game.Setup()
 	/////////////////////////////////////////////
 
 	// Key callback function to handle key press
 	// We register the callback functions after we've created the window and before the game loop is initiated.
-	window.SetKeyCallback(keycallback(&game.Keys))
+	window.SetKeyCallback(game.KeyEventHandler())
+	window.SetCursorPosCallback(game.CursorEventHandler())
+	window.SetScrollCallback(game.ScrollEventHandler())
 	window.SetInputMode(glfw.CursorMode, glfw.CursorDisabled)
-	window.SetCursorPosCallback(cursorcallback(camera))
-	window.SetScrollCallback(scrollcallback(camera))
 
 	// Game Loop
 	for !window.ShouldClose() {
@@ -89,38 +89,11 @@ func main() {
 		gl.Clear(gl.DEPTH_BUFFER_BIT)
 
 		// Run the main game render method
-		game.Render(camera)
+		game.Render()
 
 		// Swap the buffers
 		window.SwapBuffers()
 
-	}
-}
-func cursorcallback(camera *Camera) func(w *glfw.Window, xpos float64, ypos float64) {
-	return func(w *glfw.Window, xpos float64, ypos float64) {
-		camera.HandleCursorEvent(xpos, ypos)
-	}
-}
-
-func scrollcallback(camera *Camera) func(w *glfw.Window, xoff float64, yoff float64) {
-	return func(w *glfw.Window, xoff float64, yoff float64) {
-		camera.HandleScrollEvent(xoff, yoff)
-	}
-}
-
-func keycallback(keys *map[glfw.Key]bool) func(*glfw.Window, glfw.Key, int, glfw.Action, glfw.ModifierKey) {
-	return func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-		// When a user presses the escape key, we set the WindowShouldClose property to true,
-		// closing the application
-		if key == glfw.KeyEscape && action == glfw.Press {
-			w.SetShouldClose(true)
-		}
-
-		if action == glfw.Press {
-			(*keys)[key] = true
-		} else if action == glfw.Release {
-			(*keys)[key] = false
-		}
 	}
 }
 
